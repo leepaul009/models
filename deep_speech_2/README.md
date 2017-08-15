@@ -1,163 +1,90 @@
-# Deep Speech 2 on PaddlePaddle
+# GPU-algorithm
+The pattern recognition algorithms optimized with GPU and OpenCL. The algorithms are implemented with Android NDK and will run with Android application. To run the programs, the Android OpenCL library file is needed. In this case, the lib file is under "\jni\libs\libOpenCL.so"(Android Project) and "/system/lib/libOpenCL.so"(Phone Device), which is lib file from smart phone, XiaoMi 2.
 
-## Installation
 
+## The algoriths include:
+1)GPU-SVM, parallel version of kNN with a GPU-based run-time acceleration. 
+2)SVM, serial version of kNN, reference:http://www.csie.ntu.edu.tw/~cjlin/libsvm/.
+3)GPU-SVM-kNN, using a SVM-based decision-maker to refine the outcome of kNN.
+4)GPU-kNN, including GPU-Radix-kNN and GPU-Bitonic-kNN.
+
+
+# How to install:
+## Install java-sdk
+## Install android studio
+## Download android native develop kit, android-ndk-r15c-windows-x86_64.zip
+## Create android project, named 'gksvm'
+
+# Firstly, we will set ndk for android project 
+## The setting of android studio 
+For android studio, in menu Setting->Tools->External Tools, add a new item:
 ```
-sh setup.sh
-export LD_LIBRARY_PATH=$PADDLE_INSTALL_DIR/Paddle/third_party/install/warpctc/lib:$LD_LIBRARY_PATH
+	Name: javah
+	Program: $YourJavaPath\bin\javah.exe
+	Parameters: -classpath $Classpath$ -v -jni $FileClass$
+	Working directory: $YourAndroidProjectPath$\app\src\main\jni
 ```
-
-Please replace `$PADDLE_INSTALL_DIR` with your own paddle installation directory.
-
-## Usage
-
-### Preparing Data
-
+And add another new item for External Tools:
 ```
-cd datasets
-sh run_all.sh
-cd ..
-```
-
-`sh run_all.sh` prepares all ASR datasets (currently, only LibriSpeech available). After running, we have several summarization manifest files in json-format.
-
-A manifest file summarizes a speech data set, with each line containing the meta data (i.e. audio filepath, transcript text, audio duration) of each audio file within the data set, in json format. Manifest file serves as an interface informing our system of  where and what to read the speech samples.
-
-
-More help for arguments:
-
-```
-python datasets/librispeech/librispeech.py --help
-```
-
-### Preparing for Training
-
-```
-python tools/compute_mean_std.py
+Name: ndk-build
+Program: $YourNdkPath\ndk-build.cmd
+Working directory: $YourAndroidProjectPath$\app\src\main\jni
 ```
 
-It will compute mean and stdandard deviation for audio features, and save them to a file with a default name `./mean_std.npz`. This file will be used in both training and inferencing. The default feature of audio data is power spectrum, and the mfcc feature is also supported. To train and infer based on mfcc feature, please generate this file by
-
+## Create Java head file
+Edit $YourProjectFolder\local.properties, in the end of file, add following:
 ```
-python tools/compute_mean_std.py --specgram_type mfcc
+ndk.dir=$YourNdkPath\\android-ndk-r15c
+sdk.dir=$YourSdkPath\\Sdk 
 ```
-
-and specify ```--specgram_type mfcc``` when running train.py, infer.py, evaluator.py or tune.py.
-
-More help for arguments:
-
+Edit $YourProjectFolder\gradle.properties, in the end of file, add following:
 ```
-python tools/compute_mean_std.py --help
+android.useDeprecatedNdk=true
 ```
-
-### Training
-
-For GPU Training:
-
+Firstly, we will use original MainActivity.java. Add native function in MainActivity.java, as following:
 ```
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 python train.py
+private native String jnifunc();
+private native String jniSvmRes(String cmd);
 ```
-
-For CPU Training:
-
+Then build your project, and the object file will be created for following step. In the terminal window of android studio, run following command(In the case of Windows OS):
 ```
-python train.py --use_gpu False
+cd app/src/main
+mkdir jni
+javah -d jni -classpath $YourSdkPath\platforms\android-24\android.jar;$YourSdkPath\extras\android\support\v7\appcompat\libs\android-support-v7-appcompat.jar;$YourSdkPath\extras\android\support\v4\android-support-v4.jar;..\..\build\intermediates\classes\debug com.example.gksvm.MainActivity
+```
+After that, you will get a java head file under $YourAndroidProjectPath\app\src\main\jni
+```
+com_example_gksvm_MainActivity.h
 ```
 
-More help for arguments:
-
+# Build native code
+In the $YourAndroidProjectPath\app\src\main\AndroidManifest.xml, add following code:
 ```
-python train.py --help
+<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
 ```
-
-### Preparing language model
-
-The following steps, inference, parameters tuning and evaluating, will require a language model during decoding.
-A compressed language model is provided and can be accessed by
-
+We provide library and implementation code under Github, app\src\main\jni, copy the following folders into jni:
 ```
-cd ./lm
-sh run.sh
-cd ..
+include/CL //openCL head file
+libknn //library of knn
+libs //drynamic lib of opencl that is provided by smartphone vendor
+libsvm //library of svm
 ```
-
-### Inference
-
-For GPU inference
-
+Add following files into jni:
 ```
-CUDA_VISIBLE_DEVICES=0 python infer.py
+Android.mk
+Application.mk
+common.cpp
+common.h
+main.cpp
+test.cpp
+test.h
 ```
-
-For CPU inference
-
+Use given MainActivity.java to replace the one in your project
+Define your app folder in MainActivity.java (Because app folder is up to phone device)
+Copy assert fold into $YourAndroidProjectPath\app\src\main
 ```
-python infer.py --use_gpu=False
+kernel_psvmknn.cl //OpenCL kernel file
 ```
-
-More help for arguments:
-
-```
-python infer.py --help
-```
-
-### Evaluating
-
-```
-CUDA_VISIBLE_DEVICES=0 python evaluate.py
-```
-
-More help for arguments:
-
-```
-python evaluate.py --help
-```
-
-### Parameters tuning
-
-Usually, the parameters $\alpha$ and $\beta$ for the CTC [prefix beam search](https://arxiv.org/abs/1408.2873) decoder need to be tuned after retraining the acoustic model.
-
-For GPU tuning
-
-```
-CUDA_VISIBLE_DEVICES=0 python tune.py
-```
-
-For CPU tuning
-
-```
-python tune.py --use_gpu=False
-```
-
-More help for arguments:
-
-```
-python tune.py --help
-```
-
-Then reset parameters with the tuning result before inference or evaluating.
-
-### Playing with the ASR Demo
-
-A real-time ASR demo is built for users to try out the ASR model with their own voice. Please do the following installation on the machine you'd like to run the demo's client (no need for the machine running the demo's server).
-
-For example, on MAC OS X:
-
-```
-brew install portaudio
-pip install pyaudio
-pip install pynput
-```
-After a model and language model is prepared, we can first start the demo's server:
-
-```
-CUDA_VISIBLE_DEVICES=0 python demo_server.py
-```
-And then in another console, start the demo's client:
-
-```
-python demo_client.py
-```
-On the client console, press and hold the "white-space" key on the keyboard to start talking, until you finish your speech and then release the "white-space" key. The decoding results (infered transcription) will be displayed.
-
-It could be possible to start the server and the client in two seperate machines, e.g. `demo_client.py` is usually started in a machine with a microphone hardware, while `demo_server.py` is usually started in a remote server with powerful GPUs. Please first make sure that these two machines have network access to each other, and then use `--host_ip` and `--host_port` to indicate the server machine's actual IP address (instead of the `localhost` as default) and TCP port, in both `demo_server.py` and `demo_client.py`.
+Copy the file build.gradle into $YourAndroidProjectPath\app
+# C. Build your project
