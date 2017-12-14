@@ -264,6 +264,11 @@ paddle.init(...
 ```
 Use the `convert.py` to transfer an original model to the model that use BatchNorm Fusing
 ```
+# in convert.py, plz check or edit the from_path and to_path
+from_path = 'checkpoints/libri/params.latest.tar.gz'
+to_path = 'checkpoints/libri/params.latest.bnFuse.tar.gz'
+
+# then run conver.py to get the model that use BatchNorm Fusing 
 python convert.py
 ```
 create a shell script file `infer.sh` and add following code
