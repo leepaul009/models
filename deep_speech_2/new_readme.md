@@ -93,6 +93,10 @@ def infer_batch(self, ..., iters, time_infer):
 ```
 Then, to calculate the elapesd time, apply the following changes to the method `infer_batch`
 ```
+# run 10 times for dry run
+for _ in xrange(iters):
+            infer_results = self._inferer.infer(
+                input=infer_data, feeding=feeding_dict)
 tms = []
 tm_avg = 0
 tm_sd = 0
@@ -292,7 +296,7 @@ ds2_model = DeepSpeech2Model(
 ```
 
 
-### Train a model
+### Train and a model and do inference
 change the default value of `num_iter_print` to 1 
 ```
 add_arg('num_iter_print', int, 1, "Every # iterations for printing train cost.")
@@ -317,13 +321,13 @@ create a shell script file `infer.sh` and add following code
 export OMP_NUM_THREADS=38
 export OMP_DYNAMIC="False"
 export MKL_NUM_THREADS=38
-export KMP_AFFINITY="granularity=fine,explicit,proclist=[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39]"
-python -u infer_bnfuse.py --num_samples 1 --model_path='./checkpoints/libri/params.latest22.tar.gz'
-python -u infer_bnfuse.py --num_samples 2 --model_path='./checkpoints/libri/params.latest22.tar.gz'
-python -u infer_bnfuse.py --num_samples 4 --model_path='./checkpoints/libri/params.latest22.tar.gz'
-python -u infer_bnfuse.py --num_samples 8 --model_path='./checkpoints/libri/params.latest22.tar.gz'
-python -u infer_bnfuse.py --num_samples 10 --model_path='./checkpoints/libri/params.latest22.tar.gz'
+python -u infer.py --num_samples 1 --model_path='./checkpoints/libri/params.latest.bnFuse.tar.gz'
+python -u infer.py --num_samples 2 --model_path='./checkpoints/libri/params.latest.bnFuse.tar.gz'
+python -u infer.py --num_samples 4 --model_path='./checkpoints/libri/params.latest.bnFuse.tar.gz'
+python -u infer.py --num_samples 8 --model_path='./checkpoints/libri/params.latest.bnFuse.tar.gz'
+python -u infer.py --num_samples 10 --model_path='./checkpoints/libri/params.latest.bnFuse.tar.gz'
 ```
+in this case, max cpu core is 38, so you can change OMP_NUM_THREADS and MKL_NUM_THREADS according to your environment.
 If you want to use a mkl or mkldnn for inference, use the code shown below
 ```
 # inference that using mkl
