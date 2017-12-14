@@ -10,13 +10,13 @@ Merge: 950f451 10ee066
 Author: Cao Ying <lcy.seso@gmail.com>
 Date:   Thu Nov 16 18:06:21 2017 +0800
 ```
-Lastest PaddlePaddle:
+PaddlePaddle:
 ```
 commit 488320a703cc4e2fab73fa89ec41941152a0a43a
 Author: Yu Yang <yuyang18@baidu.com>
 Date:   Mon Nov 13 21:07:27 2017 -0800
 ```
-### Download and build paddlepaddle source code.
+### Download and build paddlepaddle from source code.(refer to http://doc.paddlepaddle.org/develop/doc/getstarted/build_and_install/build_from_source_en.html)
 ```
 git clone https://github.com/PaddlePaddle/Paddle.git
 cd Paddle
@@ -29,7 +29,7 @@ make all -j 44
 make install
 cd ..
 ```
-### Download and setup the deepSpeech2
+### Download and setup the deepSpeech2 (refer to https://github.com/PaddlePaddle/models/tree/develop/deep_speech_2)
 ```
 git clone https://github.com/PaddlePaddle/models.git
 cd models/deep_speech_2
@@ -47,6 +47,22 @@ cd Paddle
 ```
 In the `./paddle/gserver/layers/SequenceToBatch.cpp`, use omp to optimize the method `SequenceToBatch::sequence2BatchCopy(...)` 
 ```
+  if (useGpu_) {
+    hl_sequence2batch_copy(
+        batchData, seqData, idxData, seqWidth, batchCount, seq2batch);
+  } else {
+    /*
+    for (int i = 0; i < batchCount; ++i) {
+      if (seq2batch) {
+        memcpy(batch.rowBuf(i),
+               sequence.rowBuf(idxData[i]),
+               seqWidth * sizeof(real));
+      } else {
+        memcpy(sequence.rowBuf(idxData[i]),
+               batch.rowBuf(i),
+               seqWidth * sizeof(real));
+      }
+    }*/
     if(seq2batch){
         #pragma omp parallel for
         for (int i = 0; i < batchCount; ++i)
@@ -60,6 +76,7 @@ In the `./paddle/gserver/layers/SequenceToBatch.cpp`, use omp to optimize the me
                    batch.rowBuf(i),
                    seqWidth * sizeof(real));
     }
+  }
 ```
 Replace the `RecurrentLayer.cpp` with the packed gemm version of `RecurrentLayer.cpp`
 Then we will have a packed gemm version of RNN, which provide the best performance.
