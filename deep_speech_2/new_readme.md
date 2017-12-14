@@ -1,14 +1,23 @@
 # Deep Speech 2 on PaddlePaddle
 This doc help you to implement the deepSpeech2 that achieve a best performance in the Intel CPU platform. Please note that the RNN Mode used here is the Batch Mode.
 
-## Firstly, plz check the commit number of DeepSpeech2 shown as follow
+## Firstly, plz check the commit number of DeepSpeech2 and PaddlePaddle shown as follow
+DeepSpeech2:
 ```
 commit f9801433701abe54c7cbc442bd509698f44b6f0c
 Merge: 950f451 10ee066
 Author: Cao Ying <lcy.seso@gmail.com>
 Date:   Thu Nov 16 18:06:21 2017 +0800
 ```
-### the changes of PaddlePaddle
+PaddlePaddle:
+```
+commit 369ad06487105fe8edab240c8da0b6d7ec72f244
+Merge: 235036c 4400284
+Author: tensor-tang <jian.j.tang@intel.com>
+Date:   Wed Sep 20 23:02:43 2017 +0800
+```
+
+### The changes of PaddlePaddle
 In the `SequenceToBatch.cpp`, use omp to optimize `SequenceToBatch::sequence2BatchCopy(...)` 
 ```
     if(seq2batch){
@@ -37,6 +46,7 @@ class RecurrentLayer(LayerBase):
 ```
 Then we will the packed gemm version of RNN in DeepSpeech2, which provide the best performance.
 Build the install PaddlePaddle.
+
 
 ## Secondly, plz apply the changes shown below
 ### Use manifest.test for inference
