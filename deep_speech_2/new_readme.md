@@ -1,7 +1,8 @@
 # Deep Speech 2 on PaddlePaddle
-This doc help you to implement the deepSpeech2 that achieve a best performance in the Intel CPU platform. Please note that the RNN Mode used here is the Batch Mode.
+This doc help you to implement the deepSpeech2 that achieve a best performance in the Intel CPU platform. Please note that the RNN Mode used here is the Batch Mode. 
 
-## Firstly, plz check the commit number of DeepSpeech2 and PaddlePaddle shown as follow
+## Run original DS2 on the original paddlepaddle
+### Firstly, the commit number of DeepSpeech2 and PaddlePaddle that used here are shown as follow
 DeepSpeech2:
 ```
 commit f9801433701abe54c7cbc442bd509698f44b6f0c
@@ -9,16 +10,42 @@ Merge: 950f451 10ee066
 Author: Cao Ying <lcy.seso@gmail.com>
 Date:   Thu Nov 16 18:06:21 2017 +0800
 ```
-PaddlePaddle:
+Lastest PaddlePaddle:
 ```
-commit 369ad06487105fe8edab240c8da0b6d7ec72f244
-Merge: 235036c 4400284
-Author: tensor-tang <jian.j.tang@intel.com>
-Date:   Wed Sep 20 23:02:43 2017 +0800
+commit 488320a703cc4e2fab73fa89ec41941152a0a43a
+Author: Yu Yang <yuyang18@baidu.com>
+Date:   Mon Nov 13 21:07:27 2017 -0800
 ```
+### Download and build paddlepaddle source code.
+```
+git clone https://github.com/PaddlePaddle/Paddle.git
+cd Paddle
+git checkout 488320a703cc4e2fab73fa89ec41941152a0a43a
+pip uninstall -y paddlepaddle
+mkdir build
+cd build
+cmake ..  -DWITH_GPU=OFF -DWITH_DOC=OFF  -DWITH_STYLE_CHECK=OFF -DWITH_TESTING=ON -DWITH_SWIG_PY=ON -DWITH_TIMER=OFF -DWITH_MKLDNN=ON -DWITH_MKLML=ON
+make all -j 44
+make install
+cd ..
+```
+### Download and setup the deepSpeech2
+```
+git clone https://github.com/PaddlePaddle/models.git
+cd models/deep_speech_2
+git checkout f9801433701abe54c7cbc442bd509698f44b6f0c
+sh setup.sh
+```
+Then you can prepare the data (refer to https://github.com/PaddlePaddle/models/tree/develop/deep_speech_2#data-preparation)
+After data preparation, you can train a model and check if your environment works (refer to https://github.com/PaddlePaddle/models/tree/develop/deep_speech_2#training-a-model)
 
-### The changes of PaddlePaddle
-In the `SequenceToBatch.cpp`, use omp to optimize `SequenceToBatch::sequence2BatchCopy(...)` 
+
+## Apply the changes that could optimize the performance of PaddlePaddle
+go to the directory of Paddle 
+```
+cd Paddle
+```
+In the `./paddle/gserver/layers/SequenceToBatch.cpp`, use omp to optimize the method `SequenceToBatch::sequence2BatchCopy(...)` 
 ```
     if(seq2batch){
         #pragma omp parallel for
@@ -35,22 +62,17 @@ In the `SequenceToBatch.cpp`, use omp to optimize `SequenceToBatch::sequence2Bat
     }
 ```
 Replace the `RecurrentLayer.cpp` with the packed gemm version of `RecurrentLayer.cpp`
-In the `python/paddle/trainer/config_parser.py`, comment the following code (line 3535~3543)
-```
-@config_layer('recurrent')
-class RecurrentLayer(LayerBase):
-  ...
-  #if use_mkldnn:
-  #  self.layer_type = 'mkldnn_rnn'
-  ...
-```
-Then we will the packed gemm version of RNN in DeepSpeech2, which provide the best performance.
-Build the install PaddlePaddle.
+Then we will have a packed gemm version of RNN, which provide the best performance.
+Build and install PaddlePaddle.
 
 
-## Secondly, plz apply the changes shown below
+## apply the changes that could optimize the DeepSpeech2
+go to the directory of DeepSpeech2 
+```
+cd models/deep_speech_2
+```
 ### Use manifest.test for inference
-In the infer.py, replace the `infer_manifest` with `manifest.test`,
+In the `infer.py`, replace the `infer_manifest` with `manifest.test`,
 ```
 add_arg('infer_manifest', str, 'data/librispeech/manifest.test', "Filepath of manifest to infer.")
 ```
@@ -92,12 +114,12 @@ time_infer.append(tm_sd)
 ```
 
 ### Additional argments for deepSpeech2
-In the `infer.py`, add the argments of `rnn_use_batch` and `use_mkldnn` and let users to decide which rnn mode is used and if mkldnn is used
+In the `infer.py`, add the argments of `rnn_use_batch` and `use_mkldnn` and let users to decide which rnn mode is used and if mkldnn is used. Add the following code before `args = parser.parse_args()`
 ```
 add_arg('rnn_use_batch', bool, True, "rnn_use_batch")
 add_arg('use_mkldnn', bool, True, "use_mkldnn")
 ```
-add the argments of `rnn_use_batch` and `use_mkldnn` to `paddle.init`
+add the argments of `rnn_use_batch` and `use_mkldnn` to `paddle.init(...)`
 ```
 in the paddle.init(use_gpu=args.use_gpu,
                 trainer_count=args.trainer_count,
@@ -256,9 +278,26 @@ In the function `bidirectional_gru_bn_layer`, apply the changes shown below
             input=input_proj_backward, act=act, reverse=True)
         return paddle.layer.concat(input=[forward_gru, backward_gru])
 ```
+In the `infer.py`, apply following change
+```
+ds2_model = DeepSpeech2Model(
+        vocab_size=data_generator.vocab_size,
+        num_conv_layers=args.num_conv_layers,
+        num_rnn_layers=args.num_rnn_layers,
+        rnn_layer_size=args.rnn_layer_size,
+        use_gru=args.use_gru,
+        pretrained_model_path=args.model_path,
+        share_rnn_weights=args.share_rnn_weights,
+        fuse_bn=True)
+```
+
 
 ### Train a model
-Use Batch Mode for RNN, and train a model
+change the default value of `num_iter_print` to 1 
+```
+add_arg('num_iter_print', int, 1, "Every # iterations for printing train cost.")
+```
+make `rnn_use_batch`=True; Then we could use Batch Mode for RNN to train a model(which is faster)
 ```
 paddle.init(...
           rnn_use_batch=True,
