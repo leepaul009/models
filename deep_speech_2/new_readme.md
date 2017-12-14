@@ -142,13 +142,15 @@ paddle.layer.fc # in bidirectional_simple_rnn_bn_layer
 
 Add parameter `fuse_bn` to the following functions and make default value with `False`
 ```
-conv_bn_layer(...fuse_bn=fuse_bn)
-conv_group(...fuse_bn=fuse_bn)
-bidirectional_gru_bn_layer(...fuse_bn=fuse_bn)
-bidirectional_simple_rnn_bn_layer(...fuse_bn=fuse_bn)
-rnn_group(...fuse_bn=fuse_bn)
-deep_speech_v2_network(...fuse_bn=False)
+# defination
+def conv_bn_layer(...fuse_bn=False)
+def conv_group(...fuse_bn=False)
+def bidirectional_gru_bn_layer(...fuse_bn=False)
+def bidirectional_simple_rnn_bn_layer(...fuse_bn=False)
+def rnn_group(...fuse_bn=False)
+def deep_speech_v2_network(...fuse_bn=False)
 ```
+Also, apply the similar change where those functions are used.
 In the function `conv_bn_layer`, apply the changes shown below
 ```
     if fuse_bn == False:
