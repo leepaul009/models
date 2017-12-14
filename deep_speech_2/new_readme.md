@@ -1,13 +1,42 @@
 # Deep Speech 2 on PaddlePaddle
 This doc help you to implement the deepSpeech2 that achieve a best performance in the Intel CPU platform. Please note that the RNN Mode used here is the Batch Mode.
 
-## Firstly, plz check the commit number shown as follow
+## Firstly, plz check the commit number of DeepSpeech2 shown as follow
 ```
 commit f9801433701abe54c7cbc442bd509698f44b6f0c
 Merge: 950f451 10ee066
 Author: Cao Ying <lcy.seso@gmail.com>
 Date:   Thu Nov 16 18:06:21 2017 +0800
 ```
+### the changes of PaddlePaddle
+In the `SequenceToBatch.cpp`, use omp to optimize `SequenceToBatch::sequence2BatchCopy(...)` 
+```
+    if(seq2batch){
+        #pragma omp parallel for
+        for (int i = 0; i < batchCount; ++i)
+            memcpy(batch.rowBuf(i),
+                   sequence.rowBuf(idxData[i]),
+                   seqWidth * sizeof(real));
+    }else{
+        #pragma omp parallel for
+        for(int i=0; i<batchCount; ++i)
+            memcpy(sequence.rowBuf(idxData[i]),
+                   batch.rowBuf(i),
+                   seqWidth * sizeof(real));
+    }
+```
+Replace the `RecurrentLayer.cpp` with the packed gemm version of `RecurrentLayer.cpp`
+In the `python/paddle/trainer/config_parser.py`, comment the following code (line 3535~3543)
+```
+@config_layer('recurrent')
+class RecurrentLayer(LayerBase):
+  ...
+  #if use_mkldnn:
+  #  self.layer_type = 'mkldnn_rnn'
+  ...
+```
+Then we will the packed gemm version of RNN in DeepSpeech2, which provide the best performance.
+Build the install PaddlePaddle.
 
 ## Secondly, plz apply the changes shown below
 ### Use manifest.test for inference
