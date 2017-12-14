@@ -1,4 +1,5 @@
 # Deep Speech 2 on PaddlePaddle
+This doc help you to implement the deepSpeech2 that achieve a best performance in the Intel CPU platform. Please note that the RNN Mode used here is the Batch Mode.
 
 ## Firstly, plz check the commit number shown as follow
 ```
@@ -65,6 +66,20 @@ in the paddle.init(use_gpu=args.use_gpu,
                 use_mkldnn=args.use_mkldnn)
 ```
 
+### Setup decoder for inference
+install and build the dependency (pcre and swig)
+```
+wget http://prdownloads.sourceforge.net/swig/swig-3.0.12.tar.gz
+tar -xvzf swig-3.0.12.tar.gz
+cd swig-3.0.12/
+wget https://ftp.pcre.org/pub/pcre/pcre-8.41.tar.gz
+sh ./Tools/pcre-build.sh
+```
+setup the decoder
+```
+cd ./decoders/swig
+sh setup.sh
+```
 
 ### In order to use BatchNorm Fusing, apply the changes to model and network 
 In the `model_utils/model.py`, add a parameter `fuse_bn` to the methods `__init__` and `_create_network` of class `DeepSpeech2Model` and make its defalut value as `False`. Then we could create a network with or without BatchNorm Fusing.
@@ -201,21 +216,36 @@ In the function `bidirectional_gru_bn_layer`, apply the changes shown below
         return paddle.layer.concat(input=[forward_gru, backward_gru])
 ```
 
-
-
-### Setup the swig for decoder
-install and build the dependency
-download swig-3.0.12.tar.gz
-
-setup
+### Train a model
+Use Batch Mode for RNN, and train a model
 ```
-cd decoders/swig
-sh setup.sh
+paddle.init(...
+          rnn_use_batch=True,
+          ...)
 ```
-
-
-
-
+Use the `convert.py` to transfer an original model to the model that use BatchNorm Fusing
+```
+python convert.py
+```
+create a shell script file `infer.sh` and add following code
+```
+export OMP_NUM_THREADS=38
+export OMP_DYNAMIC="False"
+export MKL_NUM_THREADS=38
+export KMP_AFFINITY="granularity=fine,explicit,proclist=[2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39]"
+python -u infer_bnfuse.py --num_samples 1 --model_path='./checkpoints/libri/params.latest22.tar.gz'
+python -u infer_bnfuse.py --num_samples 2 --model_path='./checkpoints/libri/params.latest22.tar.gz'
+python -u infer_bnfuse.py --num_samples 4 --model_path='./checkpoints/libri/params.latest22.tar.gz'
+python -u infer_bnfuse.py --num_samples 8 --model_path='./checkpoints/libri/params.latest22.tar.gz'
+python -u infer_bnfuse.py --num_samples 10 --model_path='./checkpoints/libri/params.latest22.tar.gz'
+```
+If you want to use a mkl or mkldnn for inference, use the code shown below
+```
+# inference that using mkl
+python -u infer.py --num_samples 1  --use_mkldnn False
+# inference that using mkldnn
+python -u infer.py --num_samples 1
+```
 
 
 
