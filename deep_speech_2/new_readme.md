@@ -149,15 +149,19 @@ in the paddle.init(use_gpu=args.use_gpu,
 ```
 
 ### Setup decoder for inference
-install and build the dependency (pcre and swig)
+install and build the dependency (pcre and swig), by the way, you can also refer to the file swig-3.0.12/INSTALL
 ```
 wget http://prdownloads.sourceforge.net/swig/swig-3.0.12.tar.gz
 tar -xvzf swig-3.0.12.tar.gz
 cd swig-3.0.12/
 wget https://ftp.pcre.org/pub/pcre/pcre-8.41.tar.gz
 sh ./Tools/pcre-build.sh
+sh configure
+make
+make install
 ```
-setup the decoder
+Go to the directory of deepSpeech2
+And setup the decoder
 ```
 cd ./decoders/swig
 sh setup.sh
@@ -314,11 +318,11 @@ ds2_model = DeepSpeech2Model(
 
 
 ### Train and a model and do inference
-change the default value of `num_iter_print` to 1 
+Change the default value of `num_iter_print` to 1, so that you will get a trained model faster
 ```
 add_arg('num_iter_print', int, 1, "Every # iterations for printing train cost.")
 ```
-make `rnn_use_batch`=True; Then we could use Batch Mode for RNN to train a model(which is faster)
+Make `rnn_use_batch`=True; Then we could use Batch Mode for RNN to train a model(which is faster)
 ```
 paddle.init(...
           rnn_use_batch=True,
@@ -327,12 +331,18 @@ paddle.init(...
 Use the `convert.py` to transfer an original model to the model that use BatchNorm Fusing
 ```
 # in convert.py, plz check or edit the from_path and to_path
-from_path = 'checkpoints/libri/params.latest.tar.gz'
+from_path = 'checkpoints/libri/params.latest.tar.gz' # depend on where your trained model is
 to_path = 'checkpoints/libri/params.latest.bnFuse.tar.gz'
 
 # then run conver.py to get the model that use BatchNorm Fusing 
 python convert.py
 ```
+Train a model
+```
+export LD_LIBRIRY_PATH=$LD_LIBRIRY_PATH:$YOUR_PADDLE_DIR:/build/third_party/install/warpctc/lib/libwarpctc.so
+python train.py
+```
+
 create a shell script file `infer.sh` and add following code
 ```
 export OMP_NUM_THREADS=38
